@@ -1,0 +1,153 @@
+services:
+  users_db:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${USERS_DB_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${USERS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  products_db:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${PRODUCTS_DB_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${PRODUCTS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  orders_db:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${ORDERS_DB_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${ORDERS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  payments_db:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${PAYMENTS_DB_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${PAYMENTS_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  users_service:
+    build: ./users_service
+    ports:
+      - "${USERS_SERVICE_PORT}:8001"
+    env_file:
+      - .env
+    environment:
+      USERS_DB_URL: ${USERS_DB_URL}
+    depends_on:
+      users_db:
+        condition: service_healthy
+
+  products_service:
+    build: ./products_service
+    ports:
+      - "${PRODUCTS_SERVICE_PORT}:8002"
+    env_file:
+      - .env
+    environment:
+      PRODUCTS_DB_URL: ${PRODUCTS_DB_URL}
+    depends_on:
+      products_db:
+        condition: service_healthy
+
+  orders_service:
+    build: ./orders_service
+    ports:
+      - "${ORDERS_SERVICE_PORT}:8003"
+    env_file:
+      - .env
+    environment:
+      ORDERS_DB_URL: ${ORDERS_DB_URL}
+    depends_on:
+      orders_db:
+        condition: service_healthy
+
+  payments_service:
+    build: ./payments_service
+    ports:
+      - "${PAYMENTS_SERVICE_PORT}:8004"
+    env_file:
+      - .env
+    environment:
+      PAYMENTS_DB_URL: ${PAYMENTS_DB_URL}
+    depends_on:
+      payments_db:
+        condition: service_healthy
+
+  api_gateway:
+    build: ./api_gateway
+    ports:
+      - "${API_GATEWAY_PORT}:8000"
+    env_file:
+      - .env
+    environment:
+      USERS_SERVICE_URL: ${USERS_SERVICE_URL}
+      PRODUCTS_SERVICE_URL: ${PRODUCTS_SERVICE_URL}
+      ORDERS_SERVICE_URL: ${ORDERS_SERVICE_URL}
+      PAYMENTS_SERVICE_URL: ${PAYMENTS_SERVICE_URL}
+    depends_on:
+      users_service:
+        condition: service_started
+      products_service:
+        condition: service_started
+      orders_service:
+        condition: service_started
+      payments_service:
+        condition: service_started
+
+  memorini_frontend:
+    build:
+      context: ./memorini_frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    env_file:
+      - .env
+    depends_on:
+      api_gateway:
+        condition: service_started
+
+  seeder:
+    build: ./seeder
+    env_file:
+      - .env
+    depends_on:
+      api_gateway:
+        condition: service_started

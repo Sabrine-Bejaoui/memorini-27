@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Docker
+*.log
+
+# Flutter
+memorini_frontend/.dart_tool/
+memorini_frontend/build/
+memorini_frontend/.flutter-plugins
+memorini_frontend/.flutter-plugins-dependencies
+memorini_frontend/.packages
+
+# IDE
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+Desktop.ini
