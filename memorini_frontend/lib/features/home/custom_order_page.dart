@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/cart_store.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/memorini_header.dart';
 
 class CustomOrderPage extends StatefulWidget {
@@ -50,8 +51,10 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
     final userId = await ApiService.getUserId();
     if (userId != null) return true;
     if (!mounted) return false;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Vous devez vous connecter avant d’ajouter au panier.')),
+    AppToast.show(
+      context,
+      message: 'Vous devez vous connecter avant d’ajouter au panier.',
+      type: AppToastType.warning,
     );
     Navigator.pushNamed(context, '/login');
     return false;
@@ -66,11 +69,10 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
     if (result == null) return;
     if (result.files.length < 20) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vous devez choisir au minimum 20 photos.'),
-          backgroundColor: Colors.red,
-        ),
+      AppToast.show(
+        context,
+        message: 'Vous devez choisir au minimum 20 photos.',
+        type: AppToastType.error,
       );
       return;
     }
@@ -91,11 +93,11 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
     if (result == null) return;
     if (result.files.length != _photosNeededForCadres) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Vous devez choisir exactement $_photosNeededForCadres photo(s) pour ce cadre.'),
-          backgroundColor: Colors.red,
-        ),
+      AppToast.show(
+        context,
+        message:
+            'Vous devez choisir exactement $_photosNeededForCadres photo(s) pour ce cadre.',
+        type: AppToastType.error,
       );
       return;
     }
@@ -106,13 +108,16 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
     });
   }
 
-  List<String> _fileNames(List<PlatformFile> files) => files.map((file) => file.name).toList();
+  List<String> _fileNames(List<PlatformFile> files) =>
+      files.map((file) => file.name).toList();
 
   Future<void> _addPhotosToCart() async {
     if (!await _requireLogin()) return;
     if (_photoFiles.length < 20) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vous devez choisir au minimum 20 photos.'), backgroundColor: Colors.red),
+      AppToast.show(
+        context,
+        message: 'Vous devez choisir au minimum 20 photos.',
+        type: AppToastType.error,
       );
       return;
     }
@@ -148,11 +153,11 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
   Future<void> _addCadreToCart() async {
     if (!await _requireLogin()) return;
     if (_cadreFiles.length != _photosNeededForCadres) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Vous devez choisir exactement $_photosNeededForCadres photo(s) pour ce cadre.'),
-          backgroundColor: Colors.red,
-        ),
+      AppToast.show(
+        context,
+        message:
+            'Vous devez choisir exactement $_photosNeededForCadres photo(s) pour ce cadre.',
+        type: AppToastType.error,
       );
       return;
     }
@@ -171,17 +176,17 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
   }
 
   void _showAddedMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Produit ajouté au panier.'),
-        action: SnackBarAction(label: 'Voir panier', onPressed: () => Navigator.pushNamed(context, '/cart')),
-      ),
+    AppToast.show(
+      context,
+      message: 'Produit ajouté au panier.',
+      type: AppToastType.success,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final type = (ModalRoute.of(context)?.settings.arguments as String?) ?? 'photos';
+    final type =
+        (ModalRoute.of(context)?.settings.arguments as String?) ?? 'photos';
     return Scaffold(
       body: Column(
         children: [
@@ -201,7 +206,12 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
                         label: const Text('Retour'),
                       ),
                       const SizedBox(height: 10),
-                      if (type == 'album') _albumPage() else if (type == 'cadre') _cadrePage() else _photosPage(),
+                      if (type == 'album')
+                        _albumPage()
+                      else if (type == 'cadre')
+                        _cadrePage()
+                      else
+                        _photosPage(),
                     ],
                   ),
                 ),
@@ -218,7 +228,10 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _title('Impression Photos', 'Choisissez le format puis ajoutez au minimum 20 photos.'),
+        _title(
+          'Impression Photos',
+          'Choisissez le format puis ajoutez au minimum 20 photos.',
+        ),
         _card(
           children: [
             const Text('Format', style: _labelStyle),
@@ -227,20 +240,40 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                _choice('Polaroid', '1.50 DT / photo', _photoFormat == 'Polaroid', () => setState(() => _photoFormat = 'Polaroid')),
-                _choice('10 × 15 cm', '0.80 DT / photo', _photoFormat == '10 × 15 cm', () => setState(() => _photoFormat = '10 × 15 cm')),
-                _choice('13 × 21 cm', '1.20 DT / photo', _photoFormat == '13 × 21 cm', () => setState(() => _photoFormat = '13 × 21 cm')),
+                _choice(
+                  'Polaroid',
+                  '1.50 DT / photo',
+                  _photoFormat == 'Polaroid',
+                  () => setState(() => _photoFormat = 'Polaroid'),
+                ),
+                _choice(
+                  '10 × 15 cm',
+                  '0.80 DT / photo',
+                  _photoFormat == '10 × 15 cm',
+                  () => setState(() => _photoFormat = '10 × 15 cm'),
+                ),
+                _choice(
+                  '13 × 21 cm',
+                  '1.20 DT / photo',
+                  _photoFormat == '13 × 21 cm',
+                  () => setState(() => _photoFormat = '13 × 21 cm'),
+                ),
               ],
             ),
             const SizedBox(height: 22),
             const Text('Photos', style: _labelStyle),
             const SizedBox(height: 8),
             _uploadBox(
-              text: _photoFiles.isEmpty ? 'Choose file / choisir vos photos' : '${_photoFiles.length} photos sélectionnées',
+              text: _photoFiles.isEmpty
+                  ? 'Choose file / choisir vos photos'
+                  : '${_photoFiles.length} photos sélectionnées',
               onTap: _pickPrintPhotos,
             ),
             const SizedBox(height: 8),
-            const Text('Minimum obligatoire : 20 photos.', style: TextStyle(color: AppColors.textMuted)),
+            const Text(
+              'Minimum obligatoire : 20 photos.',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
           ],
         ),
         _summary([
@@ -257,7 +290,10 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _title('Album Photo', 'Achat simple : choisissez taille et couleur. Aucun upload photo ici.'),
+        _title(
+          'Album Photo',
+          'Achat simple : choisissez taille et couleur. Aucun upload photo ici.',
+        ),
         _card(
           children: [
             const Text('Couleur', style: _labelStyle),
@@ -266,7 +302,11 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
               spacing: 10,
               runSpacing: 10,
               children: ['Beige', 'Vert', 'Rose', 'Blanc'].map((color) {
-                return _simpleChoice(color, _albumColor == color, () => setState(() => _albumColor = color));
+                return _simpleChoice(
+                  color,
+                  _albumColor == color,
+                  () => setState(() => _albumColor = color),
+                );
               }).toList(),
             ),
             const SizedBox(height: 22),
@@ -276,13 +316,31 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                _choice('S', '25 DT', _albumSize == 'S', () => setState(() => _albumSize = 'S')),
-                _choice('M', '55 DT', _albumSize == 'M', () => setState(() => _albumSize = 'M')),
-                _choice('L', '95 DT', _albumSize == 'L', () => setState(() => _albumSize = 'L')),
+                _choice(
+                  'S',
+                  '25 DT',
+                  _albumSize == 'S',
+                  () => setState(() => _albumSize = 'S'),
+                ),
+                _choice(
+                  'M',
+                  '55 DT',
+                  _albumSize == 'M',
+                  () => setState(() => _albumSize = 'M'),
+                ),
+                _choice(
+                  'L',
+                  '95 DT',
+                  _albumSize == 'L',
+                  () => setState(() => _albumSize = 'L'),
+                ),
               ],
             ),
             const SizedBox(height: 22),
-            _qtySelector(_albumQty, (value) => setState(() => _albumQty = value)),
+            _qtySelector(
+              _albumQty,
+              (value) => setState(() => _albumQty = value),
+            ),
           ],
         ),
         _summary([
@@ -300,7 +358,10 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _title('Cadre Personnalisé', 'Choisissez le cadre puis sélectionnez seulement les photos qui vont dedans.'),
+        _title(
+          'Cadre Personnalisé',
+          'Choisissez le cadre puis sélectionnez seulement les photos qui vont dedans.',
+        ),
         _card(
           children: [
             const Text('Couleur', style: _labelStyle),
@@ -309,7 +370,11 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
               spacing: 10,
               runSpacing: 10,
               children: ['Bois', 'Noir', 'Blanc'].map((color) {
-                return _simpleChoice(color, _cadreColor == color, () => setState(() => _cadreColor = color));
+                return _simpleChoice(
+                  color,
+                  _cadreColor == color,
+                  () => setState(() => _cadreColor = color),
+                );
               }).toList(),
             ),
             const SizedBox(height: 22),
@@ -319,9 +384,24 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
               spacing: 10,
               runSpacing: 10,
               children: [
-                _choice('7 × 5 cm', '18 DT', _cadreDimension == '7 × 5 cm', () => setState(() => _cadreDimension = '7 × 5 cm')),
-                _choice('15 × 21 cm', '22 DT', _cadreDimension == '15 × 21 cm', () => setState(() => _cadreDimension = '15 × 21 cm')),
-                _choice('21 × 30 cm', '28 DT', _cadreDimension == '21 × 30 cm', () => setState(() => _cadreDimension = '21 × 30 cm')),
+                _choice(
+                  '7 × 5 cm',
+                  '18 DT',
+                  _cadreDimension == '7 × 5 cm',
+                  () => setState(() => _cadreDimension = '7 × 5 cm'),
+                ),
+                _choice(
+                  '15 × 21 cm',
+                  '22 DT',
+                  _cadreDimension == '15 × 21 cm',
+                  () => setState(() => _cadreDimension = '15 × 21 cm'),
+                ),
+                _choice(
+                  '21 × 30 cm',
+                  '28 DT',
+                  _cadreDimension == '21 × 30 cm',
+                  () => setState(() => _cadreDimension = '21 × 30 cm'),
+                ),
               ],
             ),
             const SizedBox(height: 22),
@@ -335,7 +415,9 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
             const Text('Photos du/des cadre(s)', style: _labelStyle),
             const SizedBox(height: 8),
             _uploadBox(
-              text: _cadreFiles.isEmpty ? 'Choose file / choisir $_photosNeededForCadres photo(s)' : '${_cadreFiles.length} photo(s) sélectionnée(s)',
+              text: _cadreFiles.isEmpty
+                  ? 'Choose file / choisir $_photosNeededForCadres photo(s)'
+                  : '${_cadreFiles.length} photo(s) sélectionnée(s)',
               onTap: _pickCadrePhotos,
             ),
           ],
@@ -355,9 +437,19 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontSize: 42, color: AppColors.burgundy, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 42,
+            color: AppColors.burgundy,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 8),
-        Text(subtitle, style: const TextStyle(fontSize: 17, color: AppColors.textMuted)),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 17, color: AppColors.textMuted),
+        ),
         const SizedBox(height: 24),
       ],
     );
@@ -373,11 +465,19 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.softBorder),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
     );
   }
 
-  Widget _choice(String title, String subtitle, bool selected, VoidCallback onTap) {
+  Widget _choice(
+    String title,
+    String subtitle,
+    bool selected,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -386,14 +486,27 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
         decoration: BoxDecoration(
           color: selected ? AppColors.burgundy : Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? AppColors.burgundy : AppColors.softBorder),
+          border: Border.all(
+            color: selected ? AppColors.burgundy : AppColors.softBorder,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: TextStyle(color: selected ? Colors.white : AppColors.burgundy, fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: TextStyle(
+                color: selected ? Colors.white : AppColors.burgundy,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(subtitle, style: TextStyle(color: selected ? Colors.white70 : AppColors.textMuted)),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: selected ? Colors.white70 : AppColors.textMuted,
+              ),
+            ),
           ],
         ),
       ),
@@ -408,9 +521,17 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
         decoration: BoxDecoration(
           color: selected ? AppColors.burgundy : Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? AppColors.burgundy : AppColors.softBorder),
+          border: Border.all(
+            color: selected ? AppColors.burgundy : AppColors.softBorder,
+          ),
         ),
-        child: Text(title, style: TextStyle(color: selected ? Colors.white : AppColors.burgundy, fontWeight: FontWeight.bold)),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: selected ? Colors.white : AppColors.burgundy,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
@@ -420,9 +541,18 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
       children: [
         const Text('Quantité', style: _labelStyle),
         const SizedBox(width: 16),
-        IconButton(onPressed: qty > 1 ? () => onChanged(qty - 1) : null, icon: const Icon(Icons.remove_circle_outline)),
-        Text('$qty', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        IconButton(onPressed: () => onChanged(qty + 1), icon: const Icon(Icons.add_circle_outline)),
+        IconButton(
+          onPressed: qty > 1 ? () => onChanged(qty - 1) : null,
+          icon: const Icon(Icons.remove_circle_outline),
+        ),
+        Text(
+          '$qty',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        IconButton(
+          onPressed: () => onChanged(qty + 1),
+          icon: const Icon(Icons.add_circle_outline),
+        ),
       ],
     );
   }
@@ -459,7 +589,10 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
             height: 48,
             child: ElevatedButton(
               onPressed: onAdd,
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.burgundy, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.burgundy,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Ajouter au panier'),
             ),
           ),
@@ -473,12 +606,26 @@ class _CustomOrderPageState extends State<CustomOrderPage> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Expanded(child: Text(left, style: const TextStyle(color: AppColors.textMuted))),
-          Text(right, style: const TextStyle(color: AppColors.burgundy, fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Text(
+              left,
+              style: const TextStyle(color: AppColors.textMuted),
+            ),
+          ),
+          Text(
+            right,
+            style: const TextStyle(
+              color: AppColors.burgundy,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-const TextStyle _labelStyle = TextStyle(color: AppColors.burgundy, fontWeight: FontWeight.bold);
+const TextStyle _labelStyle = TextStyle(
+  color: AppColors.burgundy,
+  fontWeight: FontWeight.bold,
+);

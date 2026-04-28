@@ -26,7 +26,11 @@ CREATE TABLE IF NOT EXISTS products (
     price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
     main_image TEXT NOT NULL,
     images TEXT,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    stock_mode VARCHAR(20) NOT NULL DEFAULT 'none'
+      CHECK (stock_mode IN ('none', 'global', 'variant')),
+    stock INTEGER CHECK (stock >= 0),
+    variant_stock TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);

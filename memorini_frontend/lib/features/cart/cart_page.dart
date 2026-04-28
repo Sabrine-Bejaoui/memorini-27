@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/constants/colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/cart_store.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/memorini_header.dart';
+import '../../models/product_model.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -20,6 +22,94 @@ class _CartPageState extends State<CartPage> {
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController(text: 'Tunis');
+
+  Future<void> _showOrderSuccessDialog() async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 450),
+                    tween: Tween(begin: 0.9, end: 1),
+                    builder: (context, value, child) =>
+                        Transform.scale(scale: value, child: child),
+                    child: Container(
+                      width: 74,
+                      height: 74,
+                      decoration: BoxDecoration(
+                        color: AppColors.burgundy.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(40),
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.burgundy,
+                        size: 42,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Commande validée',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.burgundy,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Votre commande a été passée avec succès. Nous allons vous appeler pour confirmer votre commande dans un délai de 24 à 48 heures.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.5,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.burgundy,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(52),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      label: const Text(
+                        'Voir mes commandes',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -47,10 +137,33 @@ class _CartPageState extends State<CartPage> {
     final userId = await ApiService.getUserId();
     if (userId == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vous devez vous connecter avant de passer commande.')),
+      AppToast.show(
+        context,
+        message: 'Vous devez vous connecter avant de passer commande.',
+        type: AppToastType.warning,
       );
       Navigator.pushNamed(context, '/login');
+      return;
+    }
+
+    final hasInvalidProductPhotos = items.any(
+      (item) => item.type == 'product' && item.photos.length < 20,
+    );
+    if (hasInvalidProductPhotos) {
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        message:
+            'Il faut telecharger minimum 20 photos pour passer une commande de produit.',
+        type: AppToastType.error,
+      );
+      return;
+    }
+
+    final stockError = await _validateProductStockBeforeCheckout(items);
+    if (stockError != null) {
+      if (!mounted) return;
+      AppToast.show(context, message: stockError, type: AppToastType.error);
       return;
     }
 
@@ -62,7 +175,10 @@ class _CartPageState extends State<CartPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Confirmer la commande', style: TextStyle(color: AppColors.burgundy)),
+              title: const Text(
+                'Confirmer la commande',
+                style: TextStyle(color: AppColors.burgundy),
+              ),
               content: SizedBox(
                 width: 520,
                 child: SingleChildScrollView(
@@ -74,36 +190,61 @@ class _CartPageState extends State<CartPage> {
                       children: [
                         TextFormField(
                           controller: _fullNameController,
-                          decoration: const InputDecoration(labelText: 'Nom complet'),
-                          validator: (value) => value == null || value.trim().isEmpty ? 'Nom obligatoire' : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Nom complet',
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'Nom obligatoire'
+                              : null,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(labelText: 'Téléphone'),
-                          validator: (value) => value == null || value.trim().isEmpty ? 'Téléphone obligatoire' : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Téléphone',
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'Téléphone obligatoire'
+                              : null,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _addressController,
                           maxLines: 2,
-                          decoration: const InputDecoration(labelText: 'Adresse'),
-                          validator: (value) => value == null || value.trim().isEmpty ? 'Adresse obligatoire' : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Adresse',
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'Adresse obligatoire'
+                              : null,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: _cityController,
                           decoration: const InputDecoration(labelText: 'Ville'),
-                          validator: (value) => value == null || value.trim().isEmpty ? 'Ville obligatoire' : null,
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'Ville obligatoire'
+                              : null,
                         ),
                         const SizedBox(height: 18),
-                        const Text('Résumé de la commande', style: _sectionTitle),
+                        const Text(
+                          'Résumé de la commande',
+                          style: _sectionTitle,
+                        ),
                         const SizedBox(height: 8),
-                        ...items.map((item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text('${item.qty} x ${item.name} — ${item.total.toStringAsFixed(2)} DT'),
-                            )),
+                        ...items.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              '${item.qty} x ${item.name} — ${item.total.toStringAsFixed(2)} DT',
+                            ),
+                          ),
+                        ),
                         const Divider(),
                         _totalLine('Total produits', CartStore.subtotal),
                         _totalLine('Livraison', CartStore.livraison),
@@ -115,7 +256,9 @@ class _CartPageState extends State<CartPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: _placing ? null : () => Navigator.pop(dialogContext),
+                  onPressed: _placing
+                      ? null
+                      : () => Navigator.pop(dialogContext),
                   child: const Text('Annuler'),
                 ),
                 ElevatedButton(
@@ -132,26 +275,34 @@ class _CartPageState extends State<CartPage> {
                               address: _addressController.text.trim(),
                               city: _cityController.text.trim(),
                               totalPrice: CartStore.total,
-                              items: items.map((item) => item.toJson()).toList(),
+                              items: items
+                                  .map((item) => item.toJson())
+                                  .toList(),
                             );
-                            final orderId = int.tryParse(order['id'].toString());
+                            final orderId = int.tryParse(
+                              order['id'].toString(),
+                            );
                             if (orderId != null) {
-                              await ApiService.createPayment(orderId: orderId, amount: CartStore.total);
+                              await ApiService.createPayment(
+                                orderId: orderId,
+                                amount: CartStore.total,
+                              );
                             }
                             CartStore.clear();
                             if (!mounted) return;
                             Navigator.pop(dialogContext);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Votre commande a été confirmée avec succès.'),
-                                backgroundColor: AppColors.burgundy,
-                              ),
-                            );
+                            await _showOrderSuccessDialog();
+                            if (!mounted) return;
                             Navigator.pushNamed(context, '/orders');
                           } catch (e) {
                             if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
+                            AppToast.show(
+                              context,
+                              message: e.toString().replaceFirst(
+                                'Exception: ',
+                                '',
+                              ),
+                              type: AppToastType.error,
                             );
                           } finally {
                             if (mounted) {
@@ -160,7 +311,10 @@ class _CartPageState extends State<CartPage> {
                             }
                           }
                         },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.burgundy, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.burgundy,
+                    foregroundColor: Colors.white,
+                  ),
                   child: Text(_placing ? 'Confirmation...' : 'Confirmer'),
                 ),
               ],
@@ -171,15 +325,59 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
+  Future<String?> _validateProductStockBeforeCheckout(
+    List<CartItem> items,
+  ) async {
+    final productLines = items.where((item) => item.id.startsWith('product-'));
+    if (productLines.isEmpty) return null;
+    final products = await ApiService.getProducts();
+    final productsById = <int, ProductModel>{for (final p in products) p.id: p};
+
+    final qtyByProduct = <int, int>{};
+    for (final line in productLines) {
+      final idPart = line.id.replaceFirst('product-', '');
+      final productId = int.tryParse(idPart);
+      if (productId == null) continue;
+      qtyByProduct[productId] = (qtyByProduct[productId] ?? 0) + line.qty;
+    }
+
+    for (final entry in qtyByProduct.entries) {
+      final product = productsById[entry.key];
+      if (product == null) continue;
+      final requestedQty = entry.value;
+      if (product.stockMode == 'global') {
+        final stock = product.stock ?? 0;
+        if (stock < requestedQty) {
+          return 'Stock insuffisant pour "${product.name}" (disponible: $stock).';
+        }
+      }
+      if (product.stockMode == 'variant' && product.variantStock.isEmpty) {
+        return 'Stock par variantes indisponible pour "${product.name}".';
+      }
+    }
+    return null;
+  }
+
   Widget _totalLine(String label, double amount, {bool big = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: TextStyle(fontWeight: big ? FontWeight.bold : FontWeight.normal))),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: big ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
           Text(
             '${amount.toStringAsFixed(2)} DT',
-            style: TextStyle(color: AppColors.burgundy, fontWeight: FontWeight.bold, fontSize: big ? 18 : 14),
+            style: TextStyle(
+              color: AppColors.burgundy,
+              fontWeight: FontWeight.bold,
+              fontSize: big ? 18 : 14,
+            ),
           ),
         ],
       ),
@@ -201,13 +399,27 @@ class _CartPageState extends State<CartPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.shopping_bag_outlined, size: 54, color: AppColors.textMuted),
+                        const Icon(
+                          Icons.shopping_bag_outlined,
+                          size: 54,
+                          color: AppColors.textMuted,
+                        ),
                         const SizedBox(height: 12),
-                        const Text('Votre panier est vide', style: TextStyle(fontSize: 22, color: AppColors.burgundy)),
+                        const Text(
+                          'Votre panier est vide',
+                          style: TextStyle(
+                            fontSize: 22,
+                            color: AppColors.burgundy,
+                          ),
+                        ),
                         const SizedBox(height: 14),
                         ElevatedButton(
-                          onPressed: () => Navigator.pushNamed(context, '/products'),
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.burgundy, foregroundColor: Colors.white),
+                          onPressed: () =>
+                              Navigator.pushNamed(context, '/products'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.burgundy,
+                            foregroundColor: Colors.white,
+                          ),
                           child: const Text('Voir les produits'),
                         ),
                       ],
@@ -228,9 +440,19 @@ class _CartPageState extends State<CartPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Votre panier', style: TextStyle(fontSize: 54, color: AppColors.burgundy, fontWeight: FontWeight.bold)),
+                                const Text(
+                                  'Votre panier',
+                                  style: TextStyle(
+                                    fontSize: 54,
+                                    color: AppColors.burgundy,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 const SizedBox(height: 16),
-                                ...List.generate(items.length, (index) => _cartItemCard(items[index], index)),
+                                ...List.generate(
+                                  items.length,
+                                  (index) => _cartItemCard(items[index], index),
+                                ),
                                 TextButton.icon(
                                   onPressed: CartStore.clear,
                                   icon: const Icon(Icons.delete_outline),
@@ -240,10 +462,7 @@ class _CartPageState extends State<CartPage> {
                             ),
                           ),
                           const SizedBox(width: 22),
-                          SizedBox(
-                            width: 340,
-                            child: _summaryCard(items),
-                          ),
+                          SizedBox(width: 340, child: _summaryCard(items)),
                         ],
                       ),
                     ),
@@ -264,7 +483,13 @@ class _CartPageState extends State<CartPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +497,10 @@ class _CartPageState extends State<CartPage> {
           Container(
             width: 72,
             height: 72,
-            decoration: BoxDecoration(color: const Color(0xFFF3EEE7), borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3EEE7),
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: const Icon(Icons.image_outlined, color: AppColors.textMuted),
           ),
           const SizedBox(width: 14),
@@ -280,19 +508,45 @@ class _CartPageState extends State<CartPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.name, style: const TextStyle(fontSize: 22, color: AppColors.burgundy, fontWeight: FontWeight.bold)),
+                Text(
+                  item.name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    color: AppColors.burgundy,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(item.details, style: const TextStyle(color: AppColors.textMuted)),
+                Text(
+                  item.details,
+                  style: const TextStyle(color: AppColors.textMuted),
+                ),
                 if (item.photos.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Text('Photos : ${item.photos.join(', ')}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted)),
+                  Text(
+                    'Photos : ${item.photos.join(', ')}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.textMuted),
+                  ),
                 ],
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    IconButton(onPressed: item.qty > 1 ? () => CartStore.updateQty(index, item.qty - 1) : null, icon: const Icon(Icons.remove)),
-                    Text('${item.qty}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    IconButton(onPressed: () => CartStore.updateQty(index, item.qty + 1), icon: const Icon(Icons.add)),
+                    IconButton(
+                      onPressed: item.qty > 1
+                          ? () => CartStore.updateQty(index, item.qty - 1)
+                          : null,
+                      icon: const Icon(Icons.remove),
+                    ),
+                    Text(
+                      '${item.qty}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      onPressed: () => CartStore.updateQty(index, item.qty + 1),
+                      icon: const Icon(Icons.add),
+                    ),
                     const SizedBox(width: 12),
                     Text('${item.unitPrice.toStringAsFixed(2)} DT / unité'),
                   ],
@@ -303,8 +557,18 @@ class _CartPageState extends State<CartPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              IconButton(onPressed: () => CartStore.removeAt(index), icon: const Icon(Icons.close)),
-              Text('${item.total.toStringAsFixed(2)} DT', style: const TextStyle(fontSize: 20, color: AppColors.burgundy, fontWeight: FontWeight.bold)),
+              IconButton(
+                onPressed: () => CartStore.removeAt(index),
+                icon: const Icon(Icons.close),
+              ),
+              Text(
+                '${item.total.toStringAsFixed(2)} DT',
+                style: const TextStyle(
+                  fontSize: 20,
+                  color: AppColors.burgundy,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         ],
@@ -318,17 +582,32 @@ class _CartPageState extends State<CartPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Résumé', style: TextStyle(fontSize: 26, color: AppColors.burgundy, fontWeight: FontWeight.bold)),
+          const Text(
+            'Résumé',
+            style: TextStyle(
+              fontSize: 26,
+              color: AppColors.burgundy,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 12),
-          ...items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text('${item.qty} x ${item.name}'),
-              )),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('${item.qty} x ${item.name}'),
+            ),
+          ),
           const Divider(height: 26),
           _totalLine('Total produits', CartStore.subtotal),
           _totalLine('Livraison', CartStore.livraison),
@@ -343,9 +622,14 @@ class _CartPageState extends State<CartPage> {
                 backgroundColor: AppColors.burgundy,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text('Passer commande', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+              child: const Text(
+                'Passer commande',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
             ),
           ),
         ],
@@ -354,4 +638,8 @@ class _CartPageState extends State<CartPage> {
   }
 }
 
-const TextStyle _sectionTitle = TextStyle(color: AppColors.burgundy, fontWeight: FontWeight.bold, fontSize: 16);
+const TextStyle _sectionTitle = TextStyle(
+  color: AppColors.burgundy,
+  fontWeight: FontWeight.bold,
+  fontSize: 16,
+);

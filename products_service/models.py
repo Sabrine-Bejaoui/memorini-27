@@ -12,3 +12,6 @@ class Product(Base):
     main_image = Column(String, nullable=False)
     images = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
+    stock_mode = Column(String, nullable=False, default="none")
+    stock = Column(Integer, nullable=True)
+    variant_stock = Column(Text, nullable=True)

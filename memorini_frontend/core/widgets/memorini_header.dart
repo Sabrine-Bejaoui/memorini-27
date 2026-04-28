@@ -1,8 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/colors.dart';
 
-class MemoriniHeader extends StatelessWidget {
+class MemoriniHeader extends StatefulWidget {
   const MemoriniHeader({super.key});
+
+  @override
+  State<MemoriniHeader> createState() => _MemoriniHeaderState();
+}
+
+class _MemoriniHeaderState extends State<MemoriniHeader> {
+  bool _isLoggedIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = token != null && token.isNotEmpty;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,15 +70,19 @@ class MemoriniHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
+          // Toujours affichés
           _navItem(context, 'ACCUEIL', '/'),
           _navItem(context, 'PRODUITS', '/products'),
-          _navItem(context, 'MES COMMANDES', '/orders'),
+          // Afficher "MES COMMANDES" seulement si connecté
+          if (_isLoggedIn) _navItem(context, 'MES COMMANDES', '/orders'),
           const Spacer(),
-          OutlinedButton(
-            onPressed: () => Navigator.pushNamed(context, '/cart'),
-            child: const Text('Panier'),
-          ),
-          const SizedBox(width: 12),
+          // Afficher "Panier" seulement si connecté
+          if (_isLoggedIn)
+            OutlinedButton(
+              onPressed: () => Navigator.pushNamed(context, '/cart'),
+              child: const Text('Panier'),
+            ),
+          if (_isLoggedIn) const SizedBox(width: 12),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.burgundy,

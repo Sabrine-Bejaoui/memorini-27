@@ -95,6 +95,7 @@ services:
       - .env
     environment:
       ORDERS_DB_URL: ${ORDERS_DB_URL}
+      PRODUCTS_SERVICE_URL: ${PRODUCTS_SERVICE_URL}
     depends_on:
       orders_db:
         condition: service_healthy

@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Session
-import os
 
 from models import User
-from schemas import UserRegister, UserUpdate
+from schemas import AdminCreate, UserRegister, UserUpdate
 from auth import hash_password, verify_password
 
 
@@ -13,13 +12,7 @@ def get_user_by_email(db: Session, email: str):
 def create_user(db: Session, user: UserRegister):
     hashed_password = hash_password(user.password)
     user_count = db.query(User).count()
-    admin_emails = {
-        email.strip().lower()
-        for email in os.getenv("ADMIN_EMAILS", "admin@memorini.com").split(",")
-        if email.strip()
-    }
-    should_be_admin = user.email.lower() in admin_emails
-    initial_role = "admin" if (user_count == 0 or should_be_admin) else "client"
+    initial_role = "admin" if user_count == 0 else "client"
 
     new_user = User(
         full_name=user.full_name,
@@ -49,15 +42,22 @@ def authenticate_user(db: Session, email: str, password: str):
 
 
 def ensure_admin_role_if_configured(db: Session, user: User):
-    admin_emails = {
-        email.strip().lower()
-        for email in os.getenv("ADMIN_EMAILS", "admin@memorini.com").split(",")
-        if email.strip()
-    }
-    if user.email.lower() in admin_emails and user.role != "admin":
-        user.role = "admin"
-        db.commit()
-        db.refresh(user)
+    return user
+
+
+def create_admin_user(db: Session, payload: AdminCreate):
+    hashed_password = hash_password(payload.password)
+    user = User(
+        full_name=payload.full_name,
+        email=payload.email,
+        phone=payload.phone,
+        hashed_password=hashed_password,
+        role="admin",
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return user
 
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,8 +12,15 @@ class ApiService {
   static const _userIdKey = 'user_id';
   static const _userNameKey = 'user_name';
   static const _userRoleKey = 'user_role';
+  static final ValueNotifier<int> authStateVersion = ValueNotifier<int>(0);
 
-  static Future<Map<String, String>> _buildHeaders({bool withAuth = false}) async {
+  static void _notifyAuthStateChanged() {
+    authStateVersion.value = authStateVersion.value + 1;
+  }
+
+  static Future<Map<String, String>> _buildHeaders({
+    bool withAuth = false,
+  }) async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (withAuth) {
       final token = await getToken();
@@ -64,6 +72,7 @@ class ApiService {
         await prefs.setString(_userRoleKey, user['role'].toString());
       }
     }
+    _notifyAuthStateChanged();
   }
 
   static Future<String?> getToken() async {
@@ -97,9 +106,13 @@ class ApiService {
     await prefs.remove(_userIdKey);
     await prefs.remove(_userNameKey);
     await prefs.remove(_userRoleKey);
+    _notifyAuthStateChanged();
   }
 
-  static Future<Map<String, dynamic>> login(String email, String password) async {
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/login'),
       headers: await _buildHeaders(),
@@ -131,6 +144,26 @@ class ApiService {
     return _decodeMap(response);
   }
 
+  static Future<Map<String, dynamic>> createAdmin({
+    required String fullName,
+    required String email,
+    required String password,
+    String? phone,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/users/admins'),
+      headers: await _buildHeaders(withAuth: true),
+      body: jsonEncode({
+        'full_name': fullName,
+        'email': email,
+        'password': password,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+      }),
+    );
+    _ensureSuccess(response, action: 'création admin');
+    return _decodeMap(response);
+  }
+
   static Future<List<ProductModel>> getProducts() async {
     final response = await http.get(
       Uri.parse('${ApiConfig.baseUrl}/products'),
@@ -139,7 +172,9 @@ class ApiService {
     _ensureSuccess(response, action: 'chargement des produits');
     final decoded = _decodeRaw(response);
     List rawList = [];
-    if (decoded is Map<String, dynamic> && decoded.containsKey('success') && decoded.containsKey('data')) {
+    if (decoded is Map<String, dynamic> &&
+        decoded.containsKey('success') &&
+        decoded.containsKey('data')) {
       if (decoded['data'] is List) {
         rawList = decoded['data'];
       }
@@ -162,7 +197,9 @@ class ApiService {
     _ensureSuccess(response, action: 'chargement commandes');
     final decoded = _decodeRaw(response);
     List rawList = [];
-    if (decoded is Map<String, dynamic> && decoded.containsKey('data') && decoded['data'] is List) {
+    if (decoded is Map<String, dynamic> &&
+        decoded.containsKey('data') &&
+        decoded['data'] is List) {
       rawList = decoded['data'];
     } else if (decoded is List) {
       rawList = decoded;
@@ -178,7 +215,9 @@ class ApiService {
     _ensureSuccess(response, action: 'chargement des commandes admin');
     final decoded = _decodeRaw(response);
     List rawList = [];
-    if (decoded is Map<String, dynamic> && decoded.containsKey('data') && decoded['data'] is List) {
+    if (decoded is Map<String, dynamic> &&
+        decoded.containsKey('data') &&
+        decoded['data'] is List) {
       rawList = decoded['data'];
     } else if (decoded is List) {
       rawList = decoded;
@@ -255,6 +294,9 @@ class ApiService {
     required double price,
     required String mainImage,
     String? images,
+    String stockMode = 'none',
+    int? stock,
+    List<Map<String, dynamic>>? variantStock,
   }) async {
     final response = await http.post(
       Uri.parse('${ApiConfig.baseUrl}/products'),
@@ -266,6 +308,9 @@ class ApiService {
         'price': price,
         'main_image': mainImage,
         if (images != null && images.isNotEmpty) 'images': images,
+        'stock_mode': stockMode,
+        if (stock != null) 'stock': stock,
+        if (variantStock != null) 'variant_stock': variantStock,
       }),
     );
     _ensureSuccess(response, action: 'création de produit');
@@ -280,6 +325,9 @@ class ApiService {
     required double price,
     required String mainImage,
     String? images,
+    String? stockMode,
+    int? stock,
+    List<Map<String, dynamic>>? variantStock,
   }) async {
     final response = await http.put(
       Uri.parse('${ApiConfig.baseUrl}/products/$productId'),
@@ -291,6 +339,9 @@ class ApiService {
         'price': price,
         'main_image': mainImage,
         ...?(images == null ? null : {'images': images}),
+        ...?(stockMode == null ? null : {'stock_mode': stockMode}),
+        ...?(stock == null ? null : {'stock': stock}),
+        ...?(variantStock == null ? null : {'variant_stock': variantStock}),
       }),
     );
     _ensureSuccess(response, action: 'mise à jour de produit');
@@ -313,7 +364,9 @@ class ApiService {
     _ensureSuccess(response, action: 'chargement utilisateurs');
     final decoded = _decodeRaw(response);
     List rawList = [];
-    if (decoded is Map<String, dynamic> && decoded.containsKey('data') && decoded['data'] is List) {
+    if (decoded is Map<String, dynamic> &&
+        decoded.containsKey('data') &&
+        decoded['data'] is List) {
       rawList = decoded['data'];
     } else if (decoded is List) {
       rawList = decoded;
@@ -363,6 +416,11 @@ class ApiService {
       }),
     );
     _ensureSuccess(response, action: 'mise à jour utilisateur');
+    if (fullName != null && fullName.trim().isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userNameKey, fullName.trim());
+      _notifyAuthStateChanged();
+    }
     return _decodeMap(response);
   }
 

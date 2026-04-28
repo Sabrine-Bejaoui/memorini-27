@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/colors.dart';
 import '../services/api_service.dart';
+import 'app_toast.dart';
 
 class MemoriniHeader extends StatelessWidget {
   final String activeRoute;
@@ -10,101 +11,149 @@ class MemoriniHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: Future.wait([ApiService.getToken(), ApiService.isAdmin(), ApiService.getUserName()]),
-      builder: (context, snapshot) {
-        final token = snapshot.data is List ? (snapshot.data as List)[0] as String? : null;
-        final isAdmin = snapshot.data is List ? ((snapshot.data as List)[1] as bool? ?? false) : false;
-        final userName = snapshot.data is List ? (snapshot.data as List)[2] as String? : null;
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 1180;
-            return Container(
-              height: 88,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.95),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 15,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-              ),
-              child: Row(
-                children: [
-                  _Brand(onTap: () => Navigator.pushNamed(context, isAdmin ? '/admin' : '/')),
-                  const Spacer(),
-                  if (!compact && !isAdmin) ...[
-                    _NavItem(
-                      label: 'ACCUEIL',
-                      isActive: activeRoute == '/',
-                      onTap: () => Navigator.pushNamed(context, '/'),
-                    ),
-                    _NavItem(
-                      label: 'PRODUITS',
-                      isActive: activeRoute == '/products',
-                      onTap: () => Navigator.pushNamed(context, '/products'),
-                    ),
-                    _NavItem(
-                      label: 'MES COMMANDES',
-                      isActive: activeRoute == '/orders',
-                      onTap: () => Navigator.pushNamed(context, '/orders'),
-                    ),
-                    const Spacer(),
-                  ],
-                  if (!isAdmin)
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.pushNamed(context, '/cart'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.burgundy,
-                        side: const BorderSide(color: AppColors.burgundy, width: 1.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+    return ValueListenableBuilder<int>(
+      valueListenable: ApiService.authStateVersion,
+      builder: (context, _, __) {
+        return FutureBuilder(
+          future: Future.wait([
+            ApiService.getToken(),
+            ApiService.isAdmin(),
+            ApiService.getUserName(),
+          ]),
+          builder: (context, snapshot) {
+            final token = snapshot.data is List
+                ? (snapshot.data as List)[0] as String?
+                : null;
+            final isAdmin = snapshot.data is List
+                ? ((snapshot.data as List)[1] as bool? ?? false)
+                : false;
+            final userName = snapshot.data is List
+                ? (snapshot.data as List)[2] as String?
+                : null;
+            final isLoggedIn = token != null && token.isNotEmpty;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 1180;
+                return Container(
+                  height: 88,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.95),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 15,
+                        offset: const Offset(0, 4),
                       ),
-                      icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-                      label: Text(compact ? '' : 'Panier', style: const TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  if (!isAdmin) const SizedBox(width: 14),
-                  if (token == null || token.isEmpty)
-                    FilledButton.icon(
-                      onPressed: () => Navigator.pushNamed(context, '/login'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.burgundy,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      _Brand(
+                        onTap: () => Navigator.pushNamed(
+                          context,
+                          isAdmin ? '/admin' : '/',
+                        ),
                       ),
-                      icon: const Icon(Icons.person_outline, size: 18),
-                      label: Text(compact ? '' : 'Connexion', style: const TextStyle(fontWeight: FontWeight.w600)),
-                    )
-                  else ...[
-                    if (userName != null)
-                      TextButton.icon(
-                        onPressed: () => _showProfileDialog(context, userName),
-                        icon: const Icon(Icons.person, color: AppColors.burgundy),
-                        label: Text(userName, style: const TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold)),
-                      ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: () async {
-                        await ApiService.logout();
-                        if (!context.mounted) return;
-                        Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.burgundy,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                      ),
-                      icon: const Icon(Icons.logout, size: 18),
-                      label: Text(compact ? '' : 'Déconnexion', style: const TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ],
-              ),
+                      const Spacer(),
+                      if (!compact && !isAdmin) ...[
+                        _NavItem(
+                          label: 'ACCUEIL',
+                          isActive: activeRoute == '/',
+                          onTap: () => Navigator.pushNamed(context, '/'),
+                        ),
+                        _NavItem(
+                          label: 'PRODUITS',
+                          isActive: activeRoute == '/products',
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/products'),
+                        ),
+                        if (isLoggedIn)
+                          _NavItem(
+                            label: 'PANIER',
+                            isActive: activeRoute == '/cart',
+                            onTap: () => Navigator.pushNamed(context, '/cart'),
+                          ),
+                        if (isLoggedIn)
+                          _NavItem(
+                            label: 'MES COMMANDES',
+                            isActive: activeRoute == '/orders',
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/orders'),
+                          ),
+                        const Spacer(),
+                      ],
+                      if (!isLoggedIn)
+                        FilledButton.icon(
+                          onPressed: () =>
+                              Navigator.pushNamed(context, '/login'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.burgundy,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
+                          ),
+                          icon: const Icon(Icons.person_outline, size: 18),
+                          label: Text(
+                            compact ? '' : 'Connexion',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        )
+                      else ...[
+                        if (userName != null)
+                          TextButton.icon(
+                            onPressed: () =>
+                                _showProfileDialog(context, userName),
+                            icon: const Icon(
+                              Icons.person,
+                              color: AppColors.burgundy,
+                            ),
+                            label: Text(
+                              userName,
+                              style: const TextStyle(
+                                color: AppColors.textDark,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: () async {
+                            await ApiService.logout();
+                            if (!context.mounted) return;
+                            Navigator.pushNamedAndRemoveUntil(
+                              context,
+                              '/login',
+                              (_) => false,
+                            );
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.burgundy,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 14,
+                            ),
+                          ),
+                          icon: const Icon(Icons.logout, size: 18),
+                          label: Text(
+                            compact ? '' : 'Déconnexion',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
             );
           },
         );
@@ -112,7 +161,10 @@ class MemoriniHeader extends StatelessWidget {
     );
   }
 
-  Future<void> _showProfileDialog(BuildContext context, String currentName) async {
+  Future<void> _showProfileDialog(
+    BuildContext context,
+    String currentName,
+  ) async {
     final nameCtrl = TextEditingController(text: currentName);
     final formKey = GlobalKey<FormState>();
 
@@ -128,27 +180,41 @@ class MemoriniHeader extends StatelessWidget {
               TextFormField(
                 controller: nameCtrl,
                 decoration: const InputDecoration(labelText: 'Nom complet'),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Requis' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Requis' : null,
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
           FilledButton(
             onPressed: () async {
               if (!formKey.currentState!.validate()) return;
               try {
                 final userId = await ApiService.getUserId();
                 if (userId != null) {
-                  await ApiService.updateUser(userId: userId, fullName: nameCtrl.text.trim());
-                  // We would also need to update SharedPreferences, but a re-login is simpler or we can just update it locally
+                  await ApiService.updateUser(
+                    userId: userId,
+                    fullName: nameCtrl.text.trim(),
+                  );
                 }
                 if (!ctx.mounted) return;
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Profil mis à jour')));
+                AppToast.show(
+                  context,
+                  message: 'Profil mis à jour',
+                  type: AppToastType.success,
+                );
               } catch (e) {
-                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString())));
+                AppToast.show(
+                  context,
+                  message: e.toString().replaceFirst('Exception: ', ''),
+                  type: AppToastType.error,
+                );
               }
             },
             child: const Text('Enregistrer'),
